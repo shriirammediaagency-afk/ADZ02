@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>404 — Page Not Found | Adzinox Private Limited</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Space+Grotesk:wght@400;600;700&family=Inter:wght@400;500&display=swap" />
+  <style>
+    .error-page {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 40px 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .error-code {
+      font-family: var(--font-display);
+      font-size: clamp(100px, 20vw, 200px);
+      font-weight: 900;
+      background: var(--grad-text);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1;
+      margin-bottom: 24px;
+      opacity: 0.15;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .error-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .error-title {
+      font-family: var(--font-heading);
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 16px;
+    }
+
+    .error-subtitle {
+      font-size: 16px;
+      color: var(--text-secondary);
+      max-width: 480px;
+      line-height: 1.7;
+      margin: 0 auto 40px;
+    }
+
+    .error-icon {
+      font-size: 64px;
+      margin-bottom: 24px;
+      display: block;
+    }
+
+    .error-actions {
+      display: flex;
+      gap: 16px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+  <div class="bg-noise" aria-hidden="true"></div>
+
+  <main class="error-page" role="main">
+    <div class="error-code" aria-hidden="true">404</div>
+    <div class="error-content">
+      <span class="error-icon" role="img" aria-label="Lost in space emoji">🛸</span>
+      <h1 class="error-title">Houston, We Have a Problem</h1>
+      <p class="error-subtitle">
+        The page you're looking for seems to have wandered off into the digital cosmos.
+        Don't worry — our best creatives are on the case.
+      </p>
+      <div class="error-actions">
+        <a href="index.html" class="btn btn-primary btn-lg">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+          Back to Home
+        </a>
+        <a href="index.html#contact" class="btn btn-outline btn-lg">Contact Us</a>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Apply stored theme
+    const t = localStorage.getItem('adzinox_theme');
+    if (t) document.documentElement.dataset.theme = t;
+
+    // Animated 404 floating effect
+    const code = document.querySelector('.error-code');
+    let t2 = 0;
+    function anim() {
+      t2 += 0.02;
+      code.style.transform = `translate(-50%, calc(-50% + ${Math.sin(t2) * 12}px))`;
+      requestAnimationFrame(anim);
+    }
+    anim();
+  </script>
+</body>
+</html>
