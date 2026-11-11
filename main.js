@@ -6,30 +6,157 @@
  */
 
 /* ===================================================================
-   0. WAIT FOR DOM
+   0. BOOTSTRAP — safe startup
+   -------------------------------------------------------------------
+   Fixes the "stuck on Initialising systems..." bug:
+   • if the GSAP / Three.js CDN fails, a backup CDN is tried
+   • if that fails too, a tiny built-in fallback keeps the site usable
+   • every init function runs in its own try/catch, so one error can
+     never stop the rest of the site
+   • a failsafe timer always removes the preloader
    =================================================================== */
-document.addEventListener('DOMContentLoaded', () => {
+const CDN_FALLBACKS = {
+  gsap:          'https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js',
+  ScrollTrigger: 'https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js',
+  THREE:         'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+};
+
+function loadScript(src, timeout = 4000) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    const timer = setTimeout(() => { s.remove(); reject(new Error('timeout: ' + src)); }, timeout);
+    s.src = src;
+    s.onload  = () => { clearTimeout(timer); resolve(); };
+    s.onerror = () => { clearTimeout(timer); s.remove(); reject(new Error('failed: ' + src)); };
+    document.head.appendChild(s);
+  });
+}
+
+function safeInit(fn) {
+  try { fn(); } catch (err) { console.error('[Adzinox] ' + fn.name + ' failed:', err); }
+}
+
+/* Minimal stand-in for GSAP: applies the END state of every animation
+   instantly, so the page still shows all content if GSAP cannot load. */
+function installGsapShim() {
+  console.warn('[Adzinox] GSAP unavailable — running in basic (no-animation) mode.');
+  window.__GSAP_SHIM__ = true;
+  document.documentElement.classList.add('no-gsap');
+
+  const toEls = (t) => {
+    if (typeof t === 'string') return Array.from(document.querySelectorAll(t));
+    if (!t) return [];
+    if (t.nodeType) return [t];
+    if (typeof t.length === 'number') return Array.from(t);
+    return [t];
+  };
+  const px = (n) => (typeof n === 'string' ? n : n + 'px');
+  const setProps = (el, v) => {
+    if (el.nodeType !== 1) {                         // plain object, e.g. counters {val:0}
+      Object.keys(v).forEach(k => { if (typeof v[k] === 'number') el[k] = v[k]; });
+      return;
+    }
+    if ('opacity' in v) el.style.opacity = v.opacity;
+    if ('width' in v)   el.style.width = v.width;
+    const tf = [];
+    if ('x' in v || 'y' in v) tf.push('translate(' + px(v.x || 0) + ', ' + px(v.y || 0) + ')');
+    if ('scale' in v) tf.push('scale(' + v.scale + ')');
+    if (tf.length) el.style.transform = tf.join(' ');
+  };
+  const run = (t, v, delay = 0) => {
+    v = v || {};
+    const els = toEls(t);
+    els.forEach(el => setProps(el, v));
+    const tween = { targets: () => els };
+    if (v.onUpdate)   v.onUpdate.call(tween);
+    if (v.onComplete) setTimeout(() => v.onComplete.call(tween), ((v.duration || 0) + delay) * 1000);
+    return tween;
+  };
+
+  window.gsap = {
+    to: (t, v) => run(t, v),
+    from: () => ({}),
+    set: (t, v) => { toEls(t).forEach(el => setProps(el, v || {})); },
+    timeline: () => {
+      let at = 0;
+      const tl = {
+        to(t, v) { run(t, v, at); at += (v && v.duration) || 0; return tl; },
+        from() { return tl; },
+        set() { return tl; },
+      };
+      return tl;
+    },
+    registerPlugin() {},
+    utils: { toArray: (s) => toEls(s) },
+  };
+  window.ScrollTrigger = { create(o) { if (o && o.onEnter) o.onEnter(); } };
+}
+
+/* Make sure GSAP (+ScrollTrigger) exist. Primary CDN → backup CDN → shim. */
+async function ensureGsap() {
+  if (typeof gsap === 'undefined') {
+    try { await loadScript(CDN_FALLBACKS.gsap); }
+    catch (e) { console.warn('[Adzinox]', e.message); }
+  }
+  if (typeof gsap === 'undefined') { installGsapShim(); return; }
+
+  if (typeof ScrollTrigger === 'undefined') {
+    try { await loadScript(CDN_FALLBACKS.ScrollTrigger); }
+    catch (e) { console.warn('[Adzinox]', e.message); }
+  }
+  if (typeof ScrollTrigger === 'undefined') {
+    // GSAP works but scroll animations can't → just show the content
+    console.warn('[Adzinox] ScrollTrigger unavailable — scroll animations disabled.');
+    document.documentElement.classList.add('no-scroll-anim');
+  }
+}
+
+/* Last-resort: never leave visitors staring at the loader. */
+function forceFinishPreloader() {
+  const p = document.getElementById('preloader');
+  if (!p) return;
+  console.warn('[Adzinox] Preloader failsafe triggered.');
+  p.remove();
+  document.body.classList.remove('loading');
+  document.documentElement.classList.add('no-gsap');
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  setTimeout(forceFinishPreloader, 12000);
+
+  await ensureGsap();
+
   // ── Init order ──
-  initPreloader();
-  initCustomCursor();
-  initThreeBackground();
-  initNavbar();
-  initHeroAnimations();
-  initScrollAnimations();
-  initMagneticButtons();
-  initPortfolioFilter();
-  initPortfolioModal();
-  initTestimonialsSlider();
-  initCounters();
-  initFAQ();
-  initForms();
-  initChatbot();
-  initCookieBanner();
-  initBackToTop();
-  initMarquee();
-  initSmoothScroll();
-  initThemeToggle();
-  initMobileNav();
+  [
+    initPreloader,
+    initCustomCursor,
+    initNavbar,
+    initHeroAnimations,
+    initScrollAnimations,
+    initMagneticButtons,
+    initPortfolioFilter,
+    initPortfolioModal,
+    initTestimonialsSlider,
+    initCounters,
+    initFAQ,
+    initForms,
+    initChatbot,
+    initCookieBanner,
+    initBackToTop,
+    initMarquee,
+    initSmoothScroll,
+    initThemeToggle,
+    initMobileNav,
+  ].forEach(safeInit);
+
+  // Three.js is only a decorative background → never block the page on it
+  if (typeof THREE !== 'undefined') {
+    safeInit(initThreeBackground);
+  } else {
+    loadScript(CDN_FALLBACKS.THREE)
+      .then(() => safeInit(initThreeBackground))
+      .catch(e => console.warn('[Adzinox] 3D background skipped:', e.message));
+  }
 });
 
 /* ===================================================================
@@ -85,6 +212,7 @@ function initCustomCursor() {
   const dot     = document.querySelector('.cursor-dot');
   const outline = document.querySelector('.cursor-outline');
   if (!dot || !outline || window.matchMedia('(hover: none)').matches) return;
+  if (window.__GSAP_SHIM__) return;   // no GSAP → keep the normal system cursor
 
   let mouseX = 0, mouseY = 0;
   let outX = 0, outY = 0;
@@ -528,7 +656,7 @@ function initTestimonialsSlider() {
    =================================================================== */
 function initCounters() {
   const counters = document.querySelectorAll('[data-count]');
-  if (!counters.length || typeof gsap === 'undefined') return;
+  if (!counters.length) return;
 
   counters.forEach(el => {
     const target = parseFloat(el.dataset.count);
@@ -536,7 +664,13 @@ function initCounters() {
     const prefix = el.dataset.prefix || '';
     const decimals = el.dataset.decimals || 0;
 
-    ScrollTrigger?.create({
+    // No GSAP / ScrollTrigger → just show the final number
+    if (typeof gsap === 'undefined' || typeof ScrollTrigger === 'undefined') {
+      el.textContent = prefix + target.toFixed(decimals) + suffix;
+      return;
+    }
+
+    ScrollTrigger.create({
       trigger: el,
       start: 'top 88%',
       once: true,
